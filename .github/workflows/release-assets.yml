@@ -1,0 +1,47 @@
+name: Release assets
+
+# Dipicu push tag v* — build game lalu lampirkan zip GAME & SOURCE
+# ke release GitHub (dijalankan di runner GitHub, jadi upload selalu bisa).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: install & build
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: siapkan zip GAME & SOURCE
+        run: |
+          mkdir -p stage/game/sword-of-the-sea stage/src/sword-of-the-sea
+          cp dist/index.html stage/game/sword-of-the-sea/index.html
+          printf 'SWORD OF THE SEA\n\nCara main: buka index.html di browser (double-click).\nSatu file, semua asset inline, tanpa internet & tanpa install.\n\nKontrol: A/D belok - SPACE lompat (tahan di udara = flip) - Q/E elak -\n1/2/3/4 mode kamera - drag = sudut kamera - scroll = zoom - T = setting.\n' > stage/game/sword-of-the-sea/README.txt
+          cp -r src index.html package.json package-lock.json tsconfig.json vite.config.ts README.md .env.example metadata.json stage/src/sword-of-the-sea/
+          (cd stage/game && zip -qr9 "$GITHUB_WORKSPACE/sword-of-the-sea-GAME.zip" sword-of-the-sea)
+          (cd stage/src && zip -qr9 "$GITHUB_WORKSPACE/sword-of-the-sea-SOURCE.zip" sword-of-the-sea)
+          ls -la "$GITHUB_WORKSPACE"/*.zip
+
+      - name: lampirkan ke release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --title "Sword of the Sea $TAG" --generate-notes
+          gh release upload "$TAG" \
+            sword-of-the-sea-GAME.zip sword-of-the-sea-SOURCE.zip \
+            --repo "$GITHUB_REPOSITORY" --clobber

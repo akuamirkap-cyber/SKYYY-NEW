@@ -1,0 +1,6 @@
+{
+  "name": "Sword of the Sea",
+  "description": "Sword of the Sea — an endless, juicy sand-surfing flow game. Carve the dunes on a blade of light.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
