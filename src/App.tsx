@@ -52,6 +52,19 @@ const INITIAL: HudStats = {
   crystalsCollected: 0,
   camStyle: 1,
   runTime: 0,
+  relicGateOn: false,
+  relicGateIndex: 0,
+  relicGateDist: 0,
+  relicGateBearing: 0,
+  relicStreak: 0,
+  relicsPassed: 0,
+  relicsMissed: 0,
+  boosting: false,
+  raceRank: 1,
+  raceTotal: 7,
+  botLeaderName: 'Kamu',
+  botLeaderDist: 0,
+  jumpStyle: 1,
 };
 
 export default function App() {
@@ -127,6 +140,10 @@ export default function App() {
     });
   }, []);
 
+  const toggleJumpStyle = useCallback(() => {
+    gameRef.current?.toggleJumpStyle();
+  }, []);
+
   const applyTune = useCallback((t: Partial<Tune>) => {
     gameRef.current?.setTune(t);
     setTune((prev) => ({ ...prev, ...t }));
@@ -159,6 +176,7 @@ export default function App() {
           onMute={toggleMute}
           onPause={pause}
           onTune={() => setShowTune(true)}
+          onToggleJumpStyle={toggleJumpStyle}
         />
       )}
 

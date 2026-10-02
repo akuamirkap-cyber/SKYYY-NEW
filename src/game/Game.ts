@@ -54,6 +54,7 @@ import { ACCENT_METALS, CRYSTAL_SKINS, CrystalEnv, applyCrystalSkin, customSkin 
 import { AirSystem, type AirInput } from './air';
 import { BOARD_TRICKS, GRABS } from './tricks';
 import { DownhillRelics } from './relics';
+import { RivalBotsManager } from './bots';
 
 export type GameState = 'menu' | 'playing' | 'paused' | 'over';
 
@@ -120,6 +121,13 @@ export interface HudStats {
   relicsPassed: number;
   relicsMissed: number;
   boosting: boolean;
+  // ---- RIVAL RACE
+  raceRank: number;
+  raceTotal: number;
+  botLeaderName: string;
+  botLeaderDist: number;
+  // ---- JUMP MODE
+  jumpStyle: number;
 }
 
 export interface PopupEvent {
@@ -321,6 +329,7 @@ export class Game {
   private speedPads = new SpeedPads();
   private energyCrystals = new EnergyCrystals();
   private downhillRelics = new DownhillRelics();
+  private rivalBots = new RivalBotsManager();
   private biomeScenery = new BiomeScenery();
   private shield = 3;
   private maxShield = 3;
@@ -328,6 +337,9 @@ export class Game {
   private crystalsCollected = 0;
   private lastSectorName = '';
   private dashCooldown = 0;
+  private slipstreamTimer = 0;
+  private lastRaceRank = 1;
+  private rankNotifyCooldown = 0;
   private rider = buildRider();
   private shadow: THREE.Mesh;
   private aura: THREE.Sprite;
@@ -452,7 +464,6 @@ export class Game {
   private camLook = new THREE.Vector3();
   private camRoll = 0;
   private camFov = 66;
-  private boostFov = 0;
   private lookSmooth = new THREE.Vector3();
   // ---- kamera Sekiro/bodycam: state orbit sesi (drag/scroll) + lock-on (kristal energi).
   // Pitch dasar kini datang dari tune per-mode (default Sekiro 2° = third-person),
@@ -568,6 +579,7 @@ export class Game {
     this.scene.add(this.speedPads.group);
     this.scene.add(this.energyCrystals.group);
     this.scene.add(this.downhillRelics.group);
+    this.scene.add(this.rivalBots.group);
     this.scene.add(this.biomeScenery.group);
 
     // ---- pilar SINAR PUTIH (objective): inti + lapisan glow + cincin & semburat
@@ -755,6 +767,7 @@ export class Game {
     }
     if (e.code === 'KeyS' || e.code === 'ArrowDown') this.pressStyle(-1); // auto frontflip
     if (e.code === 'KeyF') this.pressCombo(); // auto combo
+    if (e.code === 'KeyV') this.toggleJumpStyle(); // Ganti Mode Lompatan: Rendah (Menempel Pasir) ⇄ Tinggi (Melayang)
     // ---- gaya kamera (1 = Klasik · 2 = Sekiro · 3 = Sword of the Sea · 4 = Bodycam)
     if (e.code === 'Digit1') this.setCamStyle(0);
     if (e.code === 'Digit2') this.setCamStyle(1);
@@ -877,6 +890,8 @@ export class Game {
     this.crystalsCollected = 0;
     this.lastSectorName = '';
     this.dashCooldown = 0;
+    this.lastRaceRank = 1;
+    this.rankNotifyCooldown = 3.5;
     this.beamsReached = 0;
     this.spawnBeam();
     this.state = 'playing';
@@ -898,6 +913,8 @@ export class Game {
     this.crystalsCollected = 0;
     this.lastSectorName = '';
     this.dashCooldown = 0;
+    this.lastRaceRank = 1;
+    this.rankNotifyCooldown = 3.5;
     this.beamsReached = 0;
     this.spawnBeam();
     this.state = 'playing';
@@ -1064,14 +1081,18 @@ export class Game {
    */
   private jump() {
     const T = this.tune;
+    const isLow = T.jumpStyle === 1;
     const fx = Math.sin(this.yaw);
     const fz = Math.cos(this.yaw);
     const sp = Math.max(0, this.vel.x * fx + this.vel.z * fz);
     const rising = Math.max(0, this.lastGroundVy);
 
     // full carry of the slope's upward speed
-    // (pop dasar direndahkan — lompat tidak lagi terlalu tinggi)
-    let vy = (14.5 + sp * 0.16) * T.jumpPower + rising * T.launchBoost;
+    // (pop dasar disesuaikan dengan jumpStyle: rendah agar menempel pasir & tidak terbang terus, tinggi untuk melayang)
+    const basePop = isLow ? 7.2 : 14.5;
+    const spK = isLow ? 0.08 : 0.16;
+    const launchK = isLow ? 0.38 : T.launchBoost;
+    let vy = (basePop + sp * spK) * T.jumpPower + rising * launchK;
 
     // crest / mound detection
     const onMound = isOnMound(this.pos.x, this.pos.z);
@@ -1080,21 +1101,25 @@ export class Game {
     const crest = rising > 3 && ahead < here - 0.3;
 
     if (onMound || rising > 7) {
-      // Big Alto-style kicker launch! (masih besar, tapi tidak melambung gila)
-      vy = Math.max(vy, (18.5 + sp * 0.22) * T.jumpPower + rising * 1.3);
-      const pts = Math.round(180 * this.mult());
-      this.popup('GUNDUKAN AIR JUMP! ✦', `Lompatan Indah · +${pts}`, 'gold');
-      this.score += pts;
-      this.combo += 3;
-      this.flow = clamp(this.flow + 16, 0, 100);
+      if (isLow) {
+        vy = Math.max(vy, (9.5 + sp * 0.12) * T.jumpPower + rising * 0.45);
+        this.popup('LOMPATAN RENDAH! ✦', 'Gaya Menempel Pasir (Grounded)', 'cyan');
+      } else {
+        vy = Math.max(vy, (18.5 + sp * 0.22) * T.jumpPower + rising * 1.3);
+        const pts = Math.round(180 * this.mult());
+        this.popup('GUNDUKAN AIR JUMP! ✦', `Lompatan Indah · +${pts}`, 'gold');
+      }
+      this.score += Math.round((isLow ? 80 : 180) * this.mult());
+      this.combo += 2;
+      this.flow = clamp(this.flow + 14, 0, 100);
       this.audio.chime(7, 0.22);
       this.nrm.set(0, 1, 0);
       this.ripples.spawn(this.t1.copy(this.pos), this.nrm, 9 + sp * 0.08, 1.2, 0x8fe8ff);
-      this.emitBurst(this.pos, Math.round(26 * T.particles), 0.7, 0.9, 1);
+      this.emitBurst(this.pos, Math.round(20 * T.particles), 0.7, 0.9, 1);
     } else if (crest) {
-      vy *= 1 + 0.18 * T.launchBoost;
-      this.popup('CREST LAUNCH ✦', `+${Math.round(60 * this.mult())}`, 'cyan');
-      this.score += 60 * this.mult();
+      vy *= 1 + (isLow ? 0.06 : 0.18) * T.launchBoost;
+      this.popup(isLow ? 'CREST GLIDE ✦' : 'CREST LAUNCH ✦', `+${Math.round(40 * this.mult())}`, 'cyan');
+      this.score += 40 * this.mult();
       this.audio.chime(6, 0.14);
     }
 
@@ -1281,6 +1306,18 @@ export class Game {
     this.dash(1);
   }
 
+  toggleJumpStyle(): number {
+    this.tune.jumpStyle = this.tune.jumpStyle === 1 ? 0 : 1;
+    const isLow = this.tune.jumpStyle === 1;
+    this.popup(
+      isLow ? 'MODE LOMPAT: RENDAH (GROUNDED)' : 'MODE LOMPAT: TINGGI (FREESTYLE)',
+      isLow ? 'Menempel pasir gurun · Tidak terbang mulu' : 'Melayang bebas di udara',
+      isLow ? 'cyan' : 'gold',
+    );
+    this.audio.whoosh(isLow ? 0.75 : 1.15);
+    return this.tune.jumpStyle;
+  }
+
   setSteerLeft(on: boolean) {
     this.steerLeftHeld = on;
   }
@@ -1304,6 +1341,7 @@ export class Game {
     this.renderer.domElement.removeEventListener('contextmenu', this.onCtx);
     this.ro?.disconnect();
     this.audio.dispose();
+    this.rivalBots.dispose();
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);
@@ -1327,6 +1365,7 @@ export class Game {
     this.pos.set(s.x, this.groundY + this.hoverH(), s.z);
     this.biomeScenery.respawnAll(this.pos.x, this.pos.z);
     this.downhillRelics.reset(this.pos.z);
+    this.rivalBots.reset(this.pos.x, this.pos.z, this.yaw);
     this.prevGroundInit = false;
     this.groundVy = 0;
     this.prevWZ = s.z;
@@ -1531,7 +1570,10 @@ export class Game {
         this.lightDir,
         this.sandC,
       );
-      if (tex) this.rider.setEnv(tex);
+      if (tex) {
+        this.rider.setEnv(tex);
+        this.rivalBots.setEnv(tex);
+      }
       // ---- character colour (crystal skin + metal accents + sword skin)
       const T = this.tune;
       const key = `${T.crystalCustom ? T.crystalC : Math.round(T.crystalSkin)}|${Math.round(T.accentMetal)}|${Math.round(T.swordSkin)}`;
@@ -1741,6 +1783,48 @@ export class Game {
     this.monoliths.update(this.pos.x, this.pos.z, fx, fz, this.time);
     this.speedPads.update(this.pos.z, dt);
     this.energyCrystals.update(this.pos.z, this.time);
+    this.downhillRelics.update(this.pos.z, this.time);
+    this.downhillRelics.setGlow(this.tune.glare * this.tune.emissive);
+    const nextGateForBots = this.downhillRelics.getNextGate(this.pos.z).gate;
+    const raceInfo = this.rivalBots.update(
+      dt,
+      this.state,
+      this.time,
+      nextGateForBots,
+      this.pos.z,
+      sp,
+      (bot, gate) => {
+        this.popup(`${bot.name.toUpperCase()} MENEMBUS RELIK! ⚡`, `Gerbang #${gate.id} Tersentuh! Sinar Tetap Menyala!`, 'cyan');
+        this.audio.chime(6, 0.22);
+      },
+      (bot, trickName) => {
+        this.popup(`${bot.name.toUpperCase()}: ${trickName}! ✦`, 'Gaya Freestyle Lawan', 'cyan');
+        this.audio.sparkle();
+      },
+    );
+
+    if (this.state === 'playing') {
+      this.rankNotifyCooldown -= dt;
+      if (this.rankNotifyCooldown <= 0 && this.runT > 2.5) {
+        if (raceInfo.playerRank < this.lastRaceRank) {
+          // Overtook bot(s)!
+          if (raceInfo.playerRank === 1) {
+            this.popup('MEMIMPIN BALAPAN! 👑', 'Posisi #1 dari 7! Pertahankan garis depan!', 'gold');
+          } else {
+            this.popup('MENYALIP LAWAN! ✦', `Naik ke Posisi #${raceInfo.playerRank} dari 7!`, 'cyan');
+          }
+          this.audio.chime(6, 0.20);
+          this.rankNotifyCooldown = 3.2;
+        } else if (raceInfo.playerRank > this.lastRaceRank) {
+          // Got overtaken!
+          this.popup(`${raceInfo.leaderName.toUpperCase()} MENYALIP! ⚡`, `Posisi Turun ke #${raceInfo.playerRank} · Kejar dengan Boost & Slipstream!`, 'gold');
+          this.audio.thump(0.25);
+          this.rankNotifyCooldown = 4.0;
+        }
+      }
+      this.lastRaceRank = raceInfo.playerRank;
+    }
+
     this.biomeScenery.update(this.pos.x, this.pos.z);
     this.sky.mesh.position.copy(this.camera.position);
     this.aurora.mesh.position.copy(this.camera.position);
@@ -1778,6 +1862,16 @@ export class Game {
         }
       }
       if (this.shieldCooldown > 0) this.shieldCooldown -= dt;
+
+      const nextGate = this.downhillRelics.getNextGate(this.pos.z);
+      let relicBearing = 0;
+      if (nextGate.gate) {
+        const gdx = nextGate.gate.x - this.pos.x;
+        const gdz = nextGate.gate.z - this.pos.z;
+        const rfx = Math.sin(this.rig.yaw);
+        const rfz = Math.cos(this.rig.yaw);
+        relicBearing = Math.atan2(gdx * -rfz + gdz * rfx, gdx * rfx + gdz * rfz);
+      }
 
       this.hooks.onStats({
         score: this.score,
@@ -1827,6 +1921,19 @@ export class Game {
         crystalsCollected: this.crystalsCollected,
         camStyle: clamp(Math.round(this.tune.camStyle), 0, 3),
         runTime: this.runT,
+        relicGateOn: nextGate.gate !== null && nextGate.dist > 5 && nextGate.dist < 1600,
+        relicGateIndex: nextGate.gate ? nextGate.gate.id : 0,
+        relicGateDist: nextGate.dist,
+        relicGateBearing: relicBearing,
+        relicStreak: this.downhillRelics.streak,
+        relicsPassed: this.downhillRelics.totalPassed,
+        relicsMissed: this.downhillRelics.totalMissed,
+        boosting: this.boosting,
+        raceRank: raceInfo.playerRank,
+        raceTotal: 7,
+        botLeaderName: raceInfo.leaderName,
+        botLeaderDist: raceInfo.leaderDist,
+        jumpStyle: this.tune.jumpStyle,
       });
     }
 
@@ -2490,8 +2597,23 @@ export class Game {
 
     // ---- thrust (+ extra hill-climb thrust that grows with steepness)
     const fwdNow = v.x * fx + v.z * fz;
-    const cap = (this.boosting ? 100 : 72) * pace;
-    let thrust = (this.boosting ? 42 : 16) * pace * (this.grounded ? 1 : 0.1);
+    const cap = (this.boosting ? 104 : 76) * pace;
+
+    // Check slipstream drafting behind rival bots
+    const draft = this.rivalBots.checkSlipstream(p);
+    let draftBoost = 0;
+    if (draft.active && this.grounded) {
+      draftBoost = 26;
+      this.flow = Math.min(100, this.flow + dt * 25);
+      if (this.slipstreamTimer <= 0) {
+        this.popup(`SLIPSTREAM ⚡ DI BELAKANG ${draft.botName.toUpperCase()}!`, 'Dorongan Angin Kencang · Salip Sekarang!', 'cyan');
+        this.audio.whoosh(1.25);
+        this.slipstreamTimer = 3.2;
+      }
+    }
+    if (this.slipstreamTimer > 0) this.slipstreamTimer -= dt;
+
+    let thrust = ((this.boosting ? 44 : 20) + draftBoost) * pace * (this.grounded ? 1 : 0.1);
     if (this.grounded && gF > 0) thrust += gF * 20 * clamp(T.climb, 0, 1) * pace;
     if (fwdNow < cap) {
       v.x += fx * thrust * dt;
@@ -2569,9 +2691,10 @@ export class Game {
       const reach = H + (g / k) * 1.2;
       let ay = -g;
       if (!this.grounded) {
-        // gravity shaping for Alto-style hang while tricking
+        // gravity shaping for Alto-style hang while tricking (firmer downward pull in low jump mode)
         const tricking = this.airInput.flip !== 0 || this.airInput.grab;
-        ay = -g * this.air.gravityMul(v.y, this.airTune(), tricking);
+        const lowMul = this.tune.jumpStyle === 1 ? 1.5 : 1.0;
+        ay = -g * this.air.gravityMul(v.y, this.airTune(), tricking) * lowMul;
       }
       if (c < reach) {
         // push up only; force grows as we get closer (feels like air pressure)
@@ -2596,7 +2719,9 @@ export class Game {
 
       // ---- state: hovering (on the cushion) or airborne (free flight)
       if (this.grounded) {
-        if (c2 > reach + 0.9 && v.y > this.groundVy - 2) {
+        const flyMargin = this.tune.jumpStyle === 1 ? 1.8 : 0.9;
+        const vyMargin = this.tune.jumpStyle === 1 ? 0 : 2;
+        if (c2 > reach + flyMargin && v.y > this.groundVy - vyMargin) {
           // flew off the cushion
           this.grounded = false;
           this.airTime = 0;
@@ -2737,6 +2862,24 @@ export class Game {
       } else {
         this.popup(`KRISTAL SURYA +${collected}`, `Total Koleksi: ${this.crystalsCollected}`, 'gold');
       }
+    }
+
+    // ---- downhill relic slalom gates
+    const relicResult = this.downhillRelics.checkPass(p, dt);
+    if (relicResult.outcome === 'passed') {
+      const bonusScore = (250 + relicResult.streak * 50) * this.mult();
+      this.score += bonusScore;
+      this.combo = Math.min(40, this.combo + 4);
+      this.flow = 100;
+      this.vel.x += fx * 18;
+      this.vel.z += fz * 18;
+      this.shake = 0.2;
+      this.audio.chime(Math.min(10, 3 + (relicResult.streak % 7)), 0.25);
+      this.audio.sparkle();
+      this.popup(`GERBANG RELIK #${relicResult.gateId}! ✦`, `Streak ×${relicResult.streak} · SPEED BOOST! +${bonusScore} PTS`, 'gold');
+    } else if (relicResult.outcome === 'missed') {
+      this.popup('GERBANG TERLEWAT! ✕', 'Streak terputus · Ikuti kompas relik!', 'rose');
+      this.audio.thump(0.5);
     }
 
     // ---- flow

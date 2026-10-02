@@ -58,9 +58,9 @@ export class DownhillRelics {
   lastMissedTime = 0;
 
   constructor() {
-    // 1. Pillar geometry: tapered obelisk columns marking gate edges
-    const postGeo = new THREE.CylinderGeometry(0.35, 0.65, 8.0, 6);
-    postGeo.translate(0, 4.0, 0);
+    // 1. Pillar geometry: tapered obelisk columns marking gate edges (2x larger: 16m high)
+    const postGeo = new THREE.CylinderGeometry(0.7, 1.3, 16.0, 8);
+    postGeo.translate(0, 8.0, 0);
     this.postMat = new THREE.MeshStandardMaterial({
       color: 0x8a7762,
       roughness: 0.85,
@@ -73,8 +73,8 @@ export class DownhillRelics {
     this.posts = new THREE.InstancedMesh(postGeo, this.postMat, this.maxGates * 2);
     this.posts.frustumCulled = false;
 
-    // 2. Post Caps: glowing sun stones atop each pillar
-    const capGeo = new THREE.OctahedronGeometry(0.65, 0);
+    // 2. Post Caps: glowing sun stones atop each pillar (2x larger)
+    const capGeo = new THREE.OctahedronGeometry(1.3, 0);
     this.capMat = new THREE.MeshStandardMaterial({
       color: 0xffe894,
       emissive: new THREE.Color(0xffb834),
@@ -85,8 +85,8 @@ export class DownhillRelics {
     this.postCaps = new THREE.InstancedMesh(capGeo, this.capMat, this.maxGates * 2);
     this.postCaps.frustumCulled = false;
 
-    // 3. Central Sun Relic Core: floating radiant star crystal
-    const coreGeo = new THREE.OctahedronGeometry(1.2, 0);
+    // 3. Central Sun Relic Core: floating radiant star crystal (2x larger)
+    const coreGeo = new THREE.OctahedronGeometry(2.4, 0);
     this.coreMat = new THREE.MeshStandardMaterial({
       color: 0xfff6c2,
       emissive: new THREE.Color(0xffca45),
@@ -97,8 +97,8 @@ export class DownhillRelics {
     this.relicCores = new THREE.InstancedMesh(coreGeo, this.coreMat, this.maxGates);
     this.relicCores.frustumCulled = false;
 
-    // 4. Solar Ring around Relic Core
-    const ringGeo = new THREE.TorusGeometry(1.8, 0.12, 6, 18);
+    // 4. Solar Ring around Relic Core (2x larger)
+    const ringGeo = new THREE.TorusGeometry(3.6, 0.24, 8, 24);
     this.ringMat = new THREE.MeshStandardMaterial({
       color: 0xffd970,
       emissive: new THREE.Color(0xffaa20),
@@ -109,9 +109,9 @@ export class DownhillRelics {
     this.relicRings = new THREE.InstancedMesh(ringGeo, this.ringMat, this.maxGates);
     this.relicRings.frustumCulled = false;
 
-    // 5. Sky Light Beacon shooting up into the sky from the relic gate
-    const beamGeo = new THREE.CylinderGeometry(0.35, 1.2, 140, 6, 1, true);
-    beamGeo.translate(0, 70, 0);
+    // 5. Sky Light Beacon shooting up into the sky from the relic gate (2x grander)
+    const beamGeo = new THREE.CylinderGeometry(0.8, 2.5, 260, 8, 1, true);
+    beamGeo.translate(0, 130, 0);
     this.beamMat = new THREE.MeshBasicMaterial({
       color: 0xffe082,
       transparent: true,
@@ -162,7 +162,7 @@ export class DownhillRelics {
   /** Reset all gates when starting a new run */
   reset(playerZ: number) {
     this.gates = [];
-    this.lastSpawnZ = playerZ + 45;
+    this.lastSpawnZ = playerZ + 400;
     this.gateCounter = 0;
     this.streak = 0;
     this.totalPassed = 0;
@@ -177,19 +177,25 @@ export class DownhillRelics {
 
   private spawnNextGate() {
     this.gateCounter++;
-    // Downhill spacing: every 85-115 meters along the mountain descent
-    const spacing = 88 + ((this.gateCounter * 17) % 28);
+    // Downhill spacing: significantly increased to 750-1100m for rare, epic downhill milestone monuments
+    const spacing = 750 + ((this.gateCounter * 73) % 350);
     const z = this.lastSpawnZ + spacing;
     this.lastSpawnZ = z;
 
-    // Slalom lateral weave: natural carving arcs left and right downhill
-    const weave = Math.sin(this.gateCounter * 1.15) * 22 + Math.cos(this.gateCounter * 0.4) * 8;
+    // Slalom lateral weave: gentle, flowing sweeping curves down the dunes
+    const weave = Math.sin(this.gateCounter * 1.1) * 20;
     const x = pathX(z) + weave;
     const y = duneHeight(x, z);
 
-    // Orientation along the downhill path direction
-    const pAheadX = pathX(z + 8);
-    const rot = Math.atan2(pAheadX - x, 8);
+    // Orientation: tangent along the approach & exit glide trajectory
+    // Taking points before and after gives the true tangent angle, so the gate is perfectly perpendicular to the player's approach!
+    const zBefore = z - 30;
+    const xBefore = pathX(zBefore) + Math.sin((this.gateCounter - 0.05) * 1.1) * 20;
+    const zAfter = z + 30;
+    const xAfter = pathX(zAfter) + Math.sin((this.gateCounter + 0.05) * 1.1) * 20;
+    const dx = xAfter - xBefore;
+    const dz = zAfter - zBefore;
+    const rot = Math.atan2(dx, dz);
 
     const gate: RelicGateItem = {
       id: this.gateCounter,
@@ -197,8 +203,8 @@ export class DownhillRelics {
       y,
       z,
       rot,
-      width: 10.5, // 10.5m slalom gate width
-      height: 7.2,
+      width: 22.0, // 2x larger gate entrance (22m wide)
+      height: 14.5, // 2x larger height (14.5m tall)
       cleared: false,
       missed: false,
     };
@@ -225,12 +231,12 @@ export class DownhillRelics {
       // Gate lateral is (Math.cos(g.rot), -Math.sin(g.rot))
       const fwd = dx * Math.sin(g.rot) + dz * Math.cos(g.rot);
       const lat = dx * Math.cos(g.rot) - dz * Math.sin(g.rot);
-      const halfW = g.width * 0.5 + 1.2;
+      const halfW = g.width * 0.5 + 2.5;
 
       // 1. PASSED THROUGH GATE
-      if (Math.abs(fwd) < 3.2 && Math.abs(lat) <= halfW) {
-        // Vertical check: within reasonable height off ground / cushion
-        if (p.y >= g.y - 0.5 && p.y <= g.y + g.height + 4.5) {
+      if (Math.abs(fwd) < 5.5 && Math.abs(lat) <= halfW) {
+        // Vertical check: generous clearance from sand surface up to top of arch
+        if (p.y >= g.y - 1.5 && p.y <= g.y + g.height + 6.0) {
           g.cleared = true;
           this.streak++;
           this.totalPassed++;
@@ -243,9 +249,9 @@ export class DownhillRelics {
         }
       }
 
-      // 2. MISSED GATE ("GABOLEH TERLEWAT")
-      // Player has passed the gate in the forward downhill direction (+Z) without entering
-      if (fwd > 4.2 || (dz > 6.0 && Math.abs(lat) > halfW)) {
+      // 2. MISSED GATE
+      // Player has passed the gate in the forward downhill direction without entering
+      if (fwd > 7.5 && Math.abs(lat) > halfW) {
         g.missed = true;
         this.streak = 0;
         this.totalMissed++;
@@ -267,7 +273,7 @@ export class DownhillRelics {
    */
   getNextGate(pz: number): { gate: RelicGateItem | null; dist: number; dx: number; dz: number } {
     for (const g of this.gates) {
-      if (!g.cleared && !g.missed && g.z >= pz - 4) {
+      if (!g.cleared && !g.missed && g.z >= pz - 8) {
         const dz = g.z - pz;
         return { gate: g, dist: dz, dx: g.x, dz: g.z };
       }
@@ -280,7 +286,7 @@ export class DownhillRelics {
    */
   update(pz: number, time: number) {
     // If player approaches end of spawned gates, spawn more downhill
-    while (this.lastSpawnZ < pz + 750) {
+    while (this.lastSpawnZ < pz + 2800) {
       this.spawnNextGate();
     }
 
@@ -322,7 +328,7 @@ export class DownhillRelics {
       this.posts.setMatrixAt(i * 2, this.m4);
 
       // Left Cap
-      this.v.set(lx, ly + 8.1, lz);
+      this.v.set(lx, ly + 16.2, lz);
       this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), time * 1.8 + i);
       this.sc.setScalar(g.cleared ? 0.4 : 1.0);
       this.m4.compose(this.v, this.q, this.sc);
@@ -336,21 +342,27 @@ export class DownhillRelics {
       this.posts.setMatrixAt(i * 2 + 1, this.m4);
 
       // Right Cap
-      this.v.set(rx, ry + 8.1, rz);
+      this.v.set(rx, ry + 16.2, rz);
       this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), time * 1.8 + i + 1);
       this.sc.setScalar(g.cleared ? 0.4 : 1.0);
       this.m4.compose(this.v, this.q, this.sc);
       this.postCaps.setMatrixAt(i * 2 + 1, this.m4);
 
+      // Sky light beacon: SELALU MENYALA MENEMBUS LANGIT (bahkan jika relic ditabrak/cleared, sinar tetap nyala!)
+      this.v.set(g.x, gy, g.z);
+      this.q.identity();
+      this.sc.set(g.cleared ? 1.5 : 1.0, 1.0, g.cleared ? 1.5 : 1.0);
+      this.m4.compose(this.v, this.q, this.sc);
+      this.beams.setMatrixAt(i, this.m4);
+
       if (g.cleared) {
-        // Hide core and veil once cleared
+        // Hide core and veil once cleared, while the sky light beam STAYS ON!
         this.relicCores.setMatrixAt(i, this.zero);
         this.relicRings.setMatrixAt(i, this.zero);
-        this.beams.setMatrixAt(i, this.zero);
         this.energyVeils.setMatrixAt(i, this.zero);
       } else {
-        const bob = Math.sin(time * 2.4 + i * 1.5) * 0.35;
-        const coreY = gy + 4.2 + bob;
+        const bob = Math.sin(time * 2.4 + i * 1.5) * 0.6;
+        const coreY = gy + 8.4 + bob;
 
         // Central Sun Relic Core
         this.v.set(g.x, coreY, g.z);
@@ -365,17 +377,10 @@ export class DownhillRelics {
         this.m4.compose(this.v, this.q, this.sc);
         this.relicRings.setMatrixAt(i, this.m4);
 
-        // Sky light beacon
-        this.v.set(g.x, gy, g.z);
-        this.q.identity();
-        this.sc.set(1, 1, 1);
-        this.m4.compose(this.v, this.q, this.sc);
-        this.beams.setMatrixAt(i, this.m4);
-
         // Energy Veil (Gate light curtain)
-        this.v.set(g.x, gy + 3.8, g.z);
+        this.v.set(g.x, gy + 7.5, g.z);
         this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), g.rot);
-        this.sc.set(g.width, 7.5, 1);
+        this.sc.set(g.width, 15.0, 1);
         this.m4.compose(this.v, this.q, this.sc);
         this.energyVeils.setMatrixAt(i, this.m4);
       }

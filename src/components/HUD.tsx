@@ -15,6 +15,7 @@ export function Hud({
   onMute,
   onPause,
   onTune,
+  onToggleJumpStyle,
 }: {
   stats: HudStats;
   speedLines: number;
@@ -22,6 +23,7 @@ export function Hud({
   onMute: () => void;
   onPause: () => void;
   onTune: () => void;
+  onToggleJumpStyle?: () => void;
 }) {
   const speedT = Math.min(1, stats.speed / 105);
   const C = 2 * Math.PI * 34;
@@ -80,7 +82,23 @@ export function Hud({
       )}
 
       {/* top right : buttons */}
-      <div className="absolute top-5 right-5 z-30 flex gap-2 sm:top-7 sm:right-8">
+      <div className="absolute top-5 right-5 z-30 flex items-center gap-2 sm:top-7 sm:right-8">
+        {onToggleJumpStyle && (
+          <button
+            onClick={onToggleJumpStyle}
+            className={`glass flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-[10px] font-semibold tracking-[0.2em] uppercase transition hover:scale-105 active:scale-95 ${
+              stats.jumpStyle === 1
+                ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-200 shadow-[0_0_12px_rgba(80,220,255,0.45)]'
+                : 'border-amber-300/70 bg-amber-400/20 text-amber-200 shadow-[0_0_12px_rgba(255,190,60,0.45)]'
+            }`}
+            title="Ganti Mode Lompatan (Tombol V): Rendah (Pasir Menempel) vs Tinggi (Melayang)"
+          >
+            <span className="text-[12px]">{stats.jumpStyle === 1 ? '🏄' : '🦅'}</span>
+            <span className="hidden sm:inline">
+              {stats.jumpStyle === 1 ? 'Lompat Rendah' : 'Lompat Tinggi'}
+            </span>
+          </button>
+        )}
         <button
           onClick={onMute}
           className="glass flex h-9 w-9 items-center justify-center rounded-full text-sand-50 transition hover:scale-105 active:scale-95"
@@ -156,13 +174,37 @@ export function Hud({
 
       {/* distance & mountain descent HUD */}
       <div className="pointer-events-none absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center text-center sm:top-6">
-        {/* Mountain sector badge */}
-        <div className="glass flex items-center gap-2 rounded-full px-3.5 py-1 backdrop-blur-md">
-          <span className="text-[10px]">🏔️</span>
-          <span className="font-display text-[12px] font-semibold tracking-wider text-sand-50">
-            {stats.sectorName}
-          </span>
-          <span className="text-[9px] text-sand-200/60 hidden sm:inline">· {stats.sectorSubtitle}</span>
+        {/* Badges: Mountain sector + 7-Player Race position */}
+        <div className="flex items-center gap-2">
+          {/* Mountain sector badge */}
+          <div className="glass flex items-center gap-2 rounded-full px-3.5 py-1 backdrop-blur-md">
+            <span className="text-[10px]">🏔️</span>
+            <span className="font-display text-[12px] font-semibold tracking-wider text-sand-50">
+              {stats.sectorName}
+            </span>
+            <span className="text-[9px] text-sand-200/60 hidden sm:inline">· {stats.sectorSubtitle}</span>
+          </div>
+
+          {/* Race Rank Badge */}
+          <div
+            className={`glass flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold transition-all duration-300 ${
+              stats.raceRank === 1
+                ? 'border-amber-300/80 bg-amber-400/25 text-amber-200 shadow-[0_0_14px_rgba(255,200,60,0.5)]'
+                : stats.raceRank <= 3
+                  ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-200 shadow-[0_0_10px_rgba(100,220,255,0.4)]'
+                  : 'border-white/20 text-sand-200/80'
+            }`}
+          >
+            <span className="text-[10px]">{stats.raceRank === 1 ? '👑' : '🏁'}</span>
+            <span className="font-display text-[12px] tracking-wider uppercase">
+              POSISI {stats.raceRank} / {stats.raceTotal}
+            </span>
+            {stats.raceRank > 1 && stats.botLeaderDist > 10 && (
+              <span className="tnum text-[9px] text-sand-200/60 hidden sm:inline">
+                ({Math.round(stats.botLeaderDist)}m di blkg {stats.botLeaderName})
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Downhill distance & altitude */}
@@ -203,7 +245,46 @@ export function Hud({
             <span className="anim-breathe text-amber-300">✦</span>
             <span className="tnum text-[10px] text-sand-50">{stats.crystalsCollected}</span>
           </div>
+
+          {/* Relic streak */}
+          {stats.relicStreak > 0 && (
+            <>
+              <div className="h-2.5 w-[1px] bg-sand-200/30" />
+              <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-300" title="Relic Slalom Streak">
+                <span className="anim-breathe">⚡</span>
+                <span className="tnum text-[10px] text-amber-200">×{stats.relicStreak}</span>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* downhill relic gate navigator */}
+        {stats.relicGateOn && (
+          <div
+            className="glass mt-2 flex items-center gap-2 rounded-full px-3 py-[5px]"
+            style={{
+              borderColor: 'rgba(255, 215, 80, 0.65)',
+              boxShadow: '0 0 16px rgba(255, 200, 50, 0.25)',
+            }}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              className="h-4 w-4 transition-transform duration-150"
+              style={{ transform: `rotate(${(stats.relicGateBearing * 180) / Math.PI}deg)` }}
+            >
+              <path d="M10 1.5 L16 16 L10 12.5 L4 16 Z" fill="#ffd54f" />
+            </svg>
+            <span className="anim-breathe text-[9px] font-semibold tracking-[0.24em] text-amber-300 uppercase">
+              ⚡ relik #{stats.relicGateIndex}
+            </span>
+            <span className="tnum text-[10px] font-semibold text-sand-50">{fmt(stats.relicGateDist)} m</span>
+            {stats.relicStreak > 0 && (
+              <span className="rounded-full bg-amber-400/30 px-1.5 py-0.5 text-[8px] font-bold text-amber-200">
+                ×{stats.relicStreak}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* waterfall navigator */}
         {stats.navOn && (
@@ -396,6 +477,7 @@ const KEYS: [string, string][] = [
   ['SHIFT', 'boost · GRAB di udara'],
   ['W / ↑', 'air jump juga (pakai 10 flow)'],
   ['1 / 2 / 3 / 4', 'kamera: klasik · SEKIRO third-person · sinematik · BODYCAM'],
+  ['V', 'ganti MODE LOMPATAN: Rendah (Menempel Pasir) ⇄ Tinggi (Melayang Bebas)'],
   ['DRAG · SCROLL', 'semua mode: drag = sudut kamera · scroll = zoom'],
   ['R · T', 'run baru · setting'],
 ];

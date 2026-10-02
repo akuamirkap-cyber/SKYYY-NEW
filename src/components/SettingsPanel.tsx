@@ -19,9 +19,21 @@ import { BOARD_TRICKS, GRABS } from '../game/tricks';
 import { WATER_PALETTES } from '../game/river';
 
 const BODY_PRESETS = [
-  { name: 'Cebol', desc: 'proporsi pas & ramping', v: { bodyHeight: 0.55, headSize: 1.0 } },
-  { name: 'Pendek', desc: 'mungil, atletis & lincah', v: { bodyHeight: 0.78, headSize: 1.0 } },
-  { name: 'Normal', desc: 'proporsi dewasa (default) ala Silver Surfer', v: { bodyHeight: 1, headSize: 1 } },
+  {
+    name: 'Sky / Zelda ✦',
+    desc: 'proporsi anggun & lincah khas Sky: Children of the Light (default)',
+    v: { bodyHeight: 0.74, headSize: 1.08, swordSize: 0.64, scarfLength: 4.2, scarfWidth: 0.22 },
+  },
+  {
+    name: 'Cebol',
+    desc: 'mungil chibi & imut',
+    v: { bodyHeight: 0.52, headSize: 1.02, swordSize: 0.55, scarfLength: 3.2, scarfWidth: 0.18 },
+  },
+  {
+    name: 'Dewasa',
+    desc: 'proporsi jangkung ala Silver Surfer',
+    v: { bodyHeight: 1.0, headSize: 1.0, swordSize: 0.72, scarfLength: 3.4, scarfWidth: 0.16 },
+  },
 ];
 
 type Tab = 'feel' | 'move' | 'air' | 'book' | 'bloom' | 'light' | 'fog' | 'world' | 'water' | 'sky' | 'scarf' | 'grade' | 'cam' | 'fx';
@@ -921,6 +933,44 @@ export function SettingsPanel({
                 ))}
               </div>
 
+              <div className="mb-3">
+                <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.3em] text-sand-200/60">
+                  mode gaya lompatan (tekan V kapan saja)
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => set({ jumpStyle: 1 })}
+                    className={`rounded-xl border p-2.5 text-left transition ${
+                      l.jumpStyle === 1
+                        ? 'border-cyan-300 bg-cyan-400/20 text-cyan-100 shadow-[0_0_12px_rgba(80,220,255,0.4)]'
+                        : 'border-sand-200/25 bg-black/20 text-sand-200/70 hover:border-sand-100/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-display text-[15px] font-semibold">
+                      <span>🏄</span> Rendah (Grounded)
+                    </div>
+                    <div className="mt-1 text-[7.5px] leading-tight text-sand-200/60">
+                      Menempel pasir gurun · Lompat lincah cepat mendarat · Tidak terbang mulu
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => set({ jumpStyle: 0 })}
+                    className={`rounded-xl border p-2.5 text-left transition ${
+                      l.jumpStyle === 0
+                        ? 'border-amber-300 bg-amber-400/20 text-amber-100 shadow-[0_0_12px_rgba(255,190,60,0.4)]'
+                        : 'border-sand-200/25 bg-black/20 text-sand-200/70 hover:border-sand-100/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-display text-[15px] font-semibold">
+                      <span>🦅</span> Tinggi (Freestyle)
+                    </div>
+                    <div className="mt-1 text-[7.5px] leading-tight text-sand-200/60">
+                      Melayang bebas di udara · Banyak waktu untuk trik & salto
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-5 text-[9px] font-semibold uppercase tracking-[0.3em] text-sand-200/60">
                 lompatan & momentum
               </div>
@@ -1486,7 +1536,7 @@ export function SettingsPanel({
                 min={0.42}
                 max={1.12}
                 onChange={(v) => set({ bodyHeight: v })}
-                fmt={(v) => (v < 0.6 ? `cebol · ${Math.round(v * 100)}%` : v < 0.9 ? `pendek · ${Math.round(v * 100)}%` : `normal · ${Math.round(v * 100)}%`)}
+                fmt={(v) => (v < 0.6 ? `cebol · ${Math.round(v * 100)}%` : v < 0.85 ? `Sky / Zelda · ${Math.round(v * 100)}%` : `dewasa · ${Math.round(v * 100)}%`)}
               />
               <Slider
                 label="ukuran kepala"

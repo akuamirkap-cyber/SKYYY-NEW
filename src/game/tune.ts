@@ -162,6 +162,7 @@ export interface Tune {
   fogCustom: boolean; // use my own fog color
 
   // ---- AIR / TRICKS (Alto style)
+  jumpStyle: number; // 0 = Tinggi (Melayang Bebas), 1 = Rendah / Grounded (Pasir Menempel - tidak terbang mulu)
   jumpPower: number; // base pop
   launchBoost: number; // how much the terrain's upward momentum adds to the jump
   flipSpeed: number; // hold-to-flip rotation speed
@@ -279,9 +280,9 @@ export const DEFAULT_TUNE: Tune = {
   bloomDynamic: 0.08,
   glowFx: 0.18,
 
-  scarfLength: 3.4,
-  scarfWidth: 0.16,
-  scarfFlutter: 0.8,
+  scarfLength: 4.2, // Selendang jubah panjang anggun khas Sky: Children of the Light
+  scarfWidth: 0.22, // Jubah lebar melayang
+  scarfFlutter: 1.05,
   scarfColor: 0,
   scarfTwin: false, // DEFAULT = satu ujung (twin tail bisa diaktifkan di Settings)
   scarfGlow: false,
@@ -297,9 +298,9 @@ export const DEFAULT_TUNE: Tune = {
   accentMetal: 0,
   swordSkin: 0, // DEFAULT = Silver Surfer (krom reflektif)
   boardType: 0, // DEFAULT = papan surf krom ikonik Silver Surfer
-  bodyHeight: 1, // proporsi dewasa ala Silver Surfer (chibi masih ada di preset)
-  headSize: 1,
-  swordSize: 0.68,
+  bodyHeight: 0.74, // Karakter Zelda / Sky: Children of the Light (anggun, ramping & lincah)
+  headSize: 1.08, // Kepala berkarakter dengan mata bintang bercahaya khas Sky / Zelda
+  swordSize: 0.64,
   swordGlow: 1.5, // pencahayaan pedang skate terang
 
   aurora: 1, // aktif normal — warna otomatis mengikuti palet langit
@@ -342,6 +343,7 @@ export const DEFAULT_TUNE: Tune = {
   fogSky: 0.06,
   fogCustom: false,
 
+  jumpStyle: 1, // 1 = Rendah / Grounded (Pasir Menempel - tidak terbang mulu)
   jumpPower: 1,
   launchBoost: 1.1,
   flipSpeed: 1,
